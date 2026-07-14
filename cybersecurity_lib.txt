@@ -1,0 +1,253 @@
+1. Networking & Connections (socket)
+
+Used for: Port scanners, reverse shells, custom TCP/UDP clients.
+
+import socket
+
+# Create a TCP socket
+s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+# Connect to a target (IP, Port)
+target_ip = "192.168.1.10"
+target_port = 80
+try:
+    s.connect((target_ip, target_port))
+    print(f"[+] Connected to {target_ip}:{target_port}")
+except Exception as e:
+    print(f"[-] Connection failed: {e}")
+
+# Send data
+s.send(b"GET / HTTP/1.1\r\nHost: example.com\r\n\r\n")
+
+# Receive response (buffer size 4096)
+response = s.recv(4096)
+print(response.decode())
+
+# Close connection
+s.close()
+
+Common Task: Simple Port Scanner Loop
+
+for port in range(1, 1025):
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.settimeout(0.5) # Timeout to prevent hanging
+    result = sock.connect_ex((target_ip, port))
+    if result == 0:
+        print(f"Port {port} is OPEN")
+    sock.close()
+
+2. Hashing (hashlib)
+
+Used for: Checking file integrity, cracking hashes, generating checksums.
+
+import hashlib
+
+data = b"password123"
+
+# Generate SHA-256 hash
+sha256_hash = hashlib.sha256(data).hexdigest()
+print(f"SHA256: {sha256_hash}")
+
+# Generate MD5 hash (legacy, but common in CTFs)
+md5_hash = hashlib.md5(data).hexdigest()
+
+# Hashing a file (chunked for large files)
+def hash_file(filename, algorithm='sha256'):
+    h = hashlib.new(algorithm)
+    with open(filename, 'rb') as f:
+        for chunk in iter(lambda: f.read(4096), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+3. Command Line Arguments (argparse)
+
+Used for: Making your tools user-friendly (e.g., python scanner.py -t 192.168.1.1).
+
+import argparse
+
+parser = argparse.ArgumentParser(description="Simple Security Tool")
+
+# Add arguments
+parser.add_argument("-t", "--target", required=True, help="Target IP address")
+parser.add_argument("-p", "--ports", default="80,443", help="Comma-separated ports")
+parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose mode")
+
+args = parser.parse_args()
+
+# Usage
+print(f"Scanning {args.target} on ports {args.ports}")
+if args.verbose:
+    print("Verbose mode ON")
+
+4. Logging (logging)
+
+Used for: Creating audit trails, debugging scripts, avoiding messy print() statements.
+
+import logging
+
+# Configure logging (to file and console)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler("scan.log"),
+        logging.StreamHandler()
+    ]
+)
+
+logging.info("Starting scan...")
+logging.warning("Port 22 is closed.")
+logging.error("Connection timed out.")
+logging.debug("Detailed packet info here.")
+
+5. Packet Manipulation (scapy)
+
+Used for: Crafting custom packets, sniffing traffic, ARP spoofing. Install: pip install scapy (requires root/admin)
+
+from scapy.all import *
+
+# Craft a custom TCP packet
+ip_layer = IP(dst="192.168.1.1")
+tcp_layer = TCP(dport=80, flags="S") # SYN flag
+packet = ip_layer / tcp_layer
+
+# Send and receive (sendp for layer 2, send for layer 3)
+# sr1 sends and waits for 1 answer
+response = sr1(packet, timeout=2)
+
+if response:
+    response.show() # Detailed view of the packet
+
+# Sniffing traffic (limit to 10 packets)
+# filter="tcp port 80"
+packets = sniff(count=10, filter="icmp")
+for pkt in packets:
+    if pkt.haslayer(IP):
+        print(pkt[IP].src, "->", pkt[IP].dst)
+
+6. HTTP Requests (requests)
+
+Used for: Web scraping, API interaction, fuzzing, checking headers. Install: pip install requests
+
+import requests
+
+# Basic GET request
+url = "https://example.com/login"
+headers = {"User-Agent": "Mozilla/5.0"}
+params = {"q": "search_term"}
+
+try:
+    resp = requests.get(url, params=params, headers=headers, timeout=5)
+    
+    # Check status code
+    if resp.status_code == 200:
+        print("Success!")
+        print(resp.text[:500]) # Print first 500 chars
+        
+    # Check for specific header
+    if "X-Frame-Options" not in resp.headers:
+        print("[!] Missing X-Frame-Options header")
+        
+except requests.exceptions.RequestException as e:
+    print(f"Error: {e}")
+
+7. Cryptography (cryptography)
+
+Used for: Encryption/Decryption, signing, key generation. Install: pip install cryptography
+
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.backends import default_backend
+import os
+
+# Generate a random key and IV
+key = os.urandom(32) # 256-bit key for AES
+iv = os.urandom(16)  # 128-bit IV
+
+# Encrypt
+plaintext = b"Secret Message"
+cipher = Cipher(algorithms.AES(key), modes.CBC(iv), backend=default_backend())
+encryptor = cipher.encryptor()
+ciphertext = encryptor.update(plaintext) + encryptor.finalize()
+
+print(f"Ciphertext: {ciphertext.hex()}")
+
+# Decrypt
+decryptor = cipher.decryptor() # Re-use cipher object with same key/iv
+decrypted = decryptor.update(ciphertext) + decryptor.finalize()
+print(f"Decrypted: {decrypted.decode()}")
+
+8. Exploit Development (pwntools)
+
+Used for: CTFs, binary exploitation, interacting with remote services. Install: pip install pwntools
+
+from pwn import *
+
+# Connect to a remote service
+# p = remote('target.com', 1337) 
+# Or local process for testing
+p = process('./vulnerable_binary')
+
+# Send payload
+payload = b"A" * 40 + p64(0xdeadbeef) # Example: Buffer overflow + return address
+p.sendline(payload)
+
+# Receive output
+print(p.recvline().decode())
+
+# Interactive shell (drops you into the shell)
+p.interactive()
+
+9. Active Directory & Network Protocols (impacket)
+
+Used for: SMB, LDAP, Kerberos attacks, password spraying. Note: Impacket is a collection of classes/scripts, not just a single import. Install: pip install impacket
+
+# Common usage patterns (often run as standalone scripts, but can be imported)
+# Example: SMBConnection (conceptual)
+from impacket.smbconnection import SMBConnection
+
+# Connect to SMB share
+try:
+    smb = SMBConnection("TARGET_IP", "TARGET_IP")
+    smb.login("username", "password")
+    print("Logged in successfully")
+    # List shares
+    shares = smb.listShares()
+    for share in shares:
+        print(share['shi1_netname'])
+except Exception as e:
+    print(f"Failed: {e}")
+
+Tip: Most users run Impacket tools directly from the command line (e.g., psexec.py, secretsdump.py) rather than importing them into Python scripts, but the library is available for custom integration.
+10. Data Analysis (pandas)
+
+Used for: Analyzing logs, parsing CSV exports from scanners, correlating events. Install: pip install pandas
+
+import pandas as pd
+
+# Load a CSV of scan results (e.g., from Nmap or a log file)
+# df = pd.read_csv('scan_results.csv')
+
+# Create a sample dataframe
+data = {
+    'IP': ['192.168.1.1', '192.168.1.2', '192.168.1.3'],
+    'Port': [80, 443, 22],
+    'Status': ['Open', 'Open', 'Closed']
+}
+df = pd.DataFrame(data)
+
+# Filter: Show only Open ports
+open_ports = df[df['Status'] == 'Open']
+print(open_ports)
+
+# Group by status
+counts = df['Status'].value_counts()
+print(counts)
+
+# Save to new CSV
+# df.to_csv('filtered_results.csv', index=False)
+
+How to Practice
+
+    Combine them: Write a script that uses argparse to take an IP, uses socket to scan ports, logs the results with logging, and saves the open ports to a CSV file processed by pandas.
+    CTFs: Use pwntools and scapy in Capture The Flag competitions to solve challenges.
+    Automation: Use requests and impacket to automate repetitive reconnaissance tasks.
